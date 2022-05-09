@@ -1,8 +1,6 @@
 from ctypes.wintypes import HACCEL
 import numpy as np
 import xml.etree.ElementTree as ET
-import copy
-import cv2
 import os
 import math
 import json
