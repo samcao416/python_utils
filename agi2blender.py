@@ -33,8 +33,8 @@ for elem in ext_xml.iter(tag = 'PrincipalPoint'):
     dic = {}
     for i in elem.iter():
         dic[i.tag] = i.text
-    cx = dic['x']
-    cy = dic['y']
+    cx = float(dic['x'])
+    cy = float(dic['y'])
 
 for elem in ext_xml.iter(tag = 'Distorsion'):
     dic = {}
