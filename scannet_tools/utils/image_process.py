@@ -126,6 +126,7 @@ def Haar_Wavelet_Filter(gray_img, threshold, kernel_size = 8):
     return Per, BlurExtent
 
 def find_blur_threshlod(blur_value_dict):
+    blurness = []
     for f in blur_value_dict['frames']:
         blurness.append(f['blur_extent'])
     blurness = np.stack(blurness, axis = 0)
@@ -153,19 +154,23 @@ def check_image(root_dir):
             img = cv2.imread(image_path)
             img_list.append(img)
 
+    if os.path.exists(os.path.join(root_dir, 'intrinsic', 'blurness_HW.json')):
+        with open(os.path.join(root_dir, 'intrinsic', 'blurness_HW.json')) as f:
+            blur_value_dict = json.load(f)
+        
+    else:
+        blur_value_dict = {'blur_thres':0.0,'frames':[]}
 
-    blur_value_dict = {'blur_thres':0.0,'frames':[]}
+        for i, img in enumerate(img_list):
+            gray_img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+            per, blurext = Haar_Wavelet_Filter(gray_img, threshold = 35, kernel_size = 16)
+            blur_value_dict['frames'].append({'name':os.path.basename(image_path), 'per':per, 'blur_extent': blurext})
+        
+        blur_thres = find_blur_threshlod(blur_value_dict)
+        blur_value_dict['blur_thres'] = blur_thres
 
-    for i, img in enumerate(img_list):
-        gray_img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-        per, blurext = Haar_Wavelet_Filter(gray_img, threshold = 35, kernel_size = 16)
-        blur_value_dict['frames'].append({'name':os.path.basename(image_path), 'per':per, 'blur_extent': blurext})
-    
-    blur_thres = find_blur_threshlod(blur_value_dict)
-    blur_value_dict['blur_thres'] = blur_thres
-
-    saving_path = os.path.join(root_dir, 'intrinsic', 'blurness_HW.json')
-    with open(saving_path, 'w') as out_file:
-        json.dump(blur_value_dict, out_file, indent = 2)
+        saving_path = os.path.join(root_dir, 'intrinsic', 'blurness_HW.json')
+        with open(saving_path, 'w') as out_file:
+            json.dump(blur_value_dict, out_file, indent = 2)
     
     return crop_or_not, blur_value_dict 

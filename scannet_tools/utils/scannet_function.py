@@ -6,8 +6,6 @@ import glob
 import imageio
 import math
 
-from sympy import root
-
 def sharpness(imagePath):
 	image = cv2.imread(imagePath)
 	gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
@@ -39,7 +37,7 @@ def closest_point_2_lines(oa, da, ob, db): # returns point closest to both rays 
 		tb = 0
 	return (oa+ta*da+ob+tb*db) * 0.5, denom    
 
-def pose_transformation(root_dir, blur_value_dict, start= 0, end = -1, step =1, crop_or_not = False):
+def pose_transformation(root_dir, blur_value_dict, start= 0, end = -1, step =1, crop_or_not = False, filt_or_not = False):
     if crop_or_not:
         color_path = os.path.join(root_dir, 'cropped')
     else:
@@ -129,7 +127,10 @@ def pose_transformation(root_dir, blur_value_dict, start= 0, end = -1, step =1, 
     if len(pose_file_list) != len(img_path_list):
         raise RuntimeError("The number of poses does not match the number of images")
 
-    blur_thres = blur_value_dict['blur_thres']
+    if filt_or_not:
+        blur_thres = blur_value_dict['blur_thres']
+    else:
+        blur_thres = 2.0
 
     poses = []
 
@@ -146,7 +147,7 @@ def pose_transformation(root_dir, blur_value_dict, start= 0, end = -1, step =1, 
             continue
         poses.append(pose)
         img_files_list.append(img_path_list[i])
-    poses = poses.stack(poses, axis = 0)
+    poses = np.stack(poses, axis = 0)
 
 
     up = np.zeros(3).astype(np.float32)
@@ -169,7 +170,11 @@ def pose_transformation(root_dir, blur_value_dict, start= 0, end = -1, step =1, 
             # input()
         up += c2w[0:3, 1]
 
-        frame = {"file_path": os.path.join("color",os.path.basename(img_files_list[i])), "sharpness": b, "transform_matrix":pose}        
+        if crop_or_not:
+            folder_name = "cropped"
+        else:
+            folder_name = "color"
+        frame = {"file_path": os.path.join(folder_name,os.path.basename(img_files_list[i])), "sharpness": b, "transform_matrix":pose}        
         out["frames"].append(frame)
 
     nframes = len(out["frames"])
@@ -213,7 +218,7 @@ def pose_transformation(root_dir, blur_value_dict, start= 0, end = -1, step =1, 
     for f in out["frames"]:
         avglen += np.linalg.norm(f["transform_matrix"][0:3,3])
     avglen /= nframes
-    avglen_scale = 2.0/8.0
+    avglen_scale = 1.0/8.0
     print("avg camera distance from origin", avglen)
     for f in out["frames"]:
         f["transform_matrix"][0:3,3] *= avglen_scale / avglen # scale to "nerf sized"
@@ -232,7 +237,7 @@ def pose_transformation(root_dir, blur_value_dict, start= 0, end = -1, step =1, 
 
     pass
 
-def pose_original(root_dir, blur_value_dict, start = 0, end = 0, step = 1, crop_or_not = False):
+def pose_original(root_dir, blur_value_dict, start = 0, end = 0, step = 1, crop_or_not = False, filt_or_not = False):
     if crop_or_not:
         color_path = os.path.join(root_dir, 'cropped')
     else:
@@ -302,7 +307,10 @@ def pose_original(root_dir, blur_value_dict, start = 0, end = 0, step = 1, crop_
     if len(pose_file_list) != len(img_path_list):
         raise RuntimeError("The number of poses does not match the number of images")
 
-    blur_thres = blur_value_dict['blur_thres']
+    if filt_or_not:
+        blur_thres = blur_value_dict['blur_thres']
+    else:
+        blur_thres = 2.0
 
     poses = []
 
@@ -319,7 +327,7 @@ def pose_original(root_dir, blur_value_dict, start = 0, end = 0, step = 1, crop_
             continue
         poses.append(pose)
         img_files_list.append(img_path_list[i])
-    poses = poses.stack(poses, axis = 0)
+    poses = np.stack(poses, axis = 0)
         
 
     # path_file_list = path_file_list[start:end:step]
@@ -342,7 +350,7 @@ def pose_original(root_dir, blur_value_dict, start = 0, end = 0, step = 1, crop_
     poses[:, :3, 2] *= -1
     poses[:, :3, 1] *= -1
 
-    resize_scale = 0.25 / np.max(max_point - min_point)
+    resize_scale = 0.125 / np.max(max_point - min_point)
 
     poses[:,:3, 3]  =  (poses[:,:3, 3] - center) * resize_scale
 
@@ -353,7 +361,11 @@ def pose_original(root_dir, blur_value_dict, start = 0, end = 0, step = 1, crop_
         
         b = sharpness(name)
 
-        frame = {"file_path": os.path.join("color",os.path.basename(img_files_list[i])), "sharpness": b, "transform_matrix":pose}
+        if crop_or_not:
+            folder_name = "cropped"
+        else:
+            folder_name = "color"
+        frame = {"file_path": os.path.join(folder_name,os.path.basename(img_files_list[i])), "sharpness": b, "transform_matrix":pose}        
         out["frames"].append(frame)
 
     nframes = len(out["frames"])

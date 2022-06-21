@@ -4,6 +4,7 @@ import os
 import argparse
 
 import sys
+sys.path.append("..")
 
 from scannet_tools.utils.SensorData import SensorData
 from scannet_tools.utils.scannet_function import pose_transformation, pose_original
@@ -17,6 +18,7 @@ if __name__ == "__main__":
     parser.add_argument('--group', type = int, default = 0)
     parser.add_argument('--build_new', action = "store_true")
     parser.add_argument('--transform', action = "store_true", help='whether add transformations on oringal poses')
+    parser.add_argument('--blur_filt', action = "store_true")
     parser.add_argument('--start', type = int ,default=0)
     parser.add_argument('--end', type = int, default=-1)
     parser.add_argument('--step', type = int, default = 1)
@@ -70,7 +72,7 @@ if __name__ == "__main__":
         '''
         crop_or_not, blur_value_dict = check_image(root_dir)
 
-        process_poses(root_dir, blur_value_dict, start = arg.start, end = arg.end, crop_or_not = crop_or_not)
+        process_poses(root_dir, blur_value_dict, start = arg.start, end = arg.end, crop_or_not = crop_or_not, filt_or_not=arg.blur_filt)
 
 
         
