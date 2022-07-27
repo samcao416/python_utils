@@ -16,7 +16,7 @@ def reset_blender():
     bpy.ops.object.select_all(action = 'DESELECT')
     for obj in bpy.data.objects:
         # print(ob.name)
-        if obj.name == ('Light' or 'Camera'):
+        if obj.name == ('Light') or obj.name == ('Camera'):
             continue
         obj.select_set(True)
         bpy.ops.object.delete()
@@ -68,9 +68,11 @@ def dealRotate(bd_min,bd_max,loc,axis):
 
     translate_bd(bd_min,bd_max)
 
-    zmax = bd_max[2]
+    zmax = bd_max[2] - bd_min[2]
     xyz_min = (bd_min - bd_max) / 2
     xyz_max = (bd_max - bd_min) / 2
+    bd_min = xyz_min
+    bd_max = xyz_max
     bd_min[2] = 0
     bd_max[2] = zmax
     return bd_min, bd_max
@@ -129,7 +131,7 @@ def translate_bd(bd_min,bd_max):
     hwd = bd_max-bd_min
     h = np.max(hwd)
     scale = 1
-    translatez =  bd_min[2]/1000
+    translatez =  bd_min[2]
     translatey = ((bd_max[1]+bd_min[1])/2)
     translatex = ((bd_max[0]+bd_min[0])/2)
     selectCar()
@@ -175,7 +177,7 @@ if __name__ == "__main__":
     '''
             Initialization       
     '''
-    DEBUG = False
+    DEBUG = False 
     if DEBUG:
         #fbx_dir = "/media/stereye/新加卷/Sam/car_models/130_benz/Mercedes-Benz C63 AMG Coupe 2017.zip_extract/Mercedes-Benz_C63_AMG_Coupe_2017/Mercedes-Benz_C63_AMG_Coupe_2017_set.fbx"
         # fbx_dir = "/media/stereye/新加卷/Sam/car_models/77_chevrolet/Chevrolet Camaro SS 2020 3D model.zip_extract/Chevrolet Camaro SS 2020 3D model/Chevrolet Camaro/camaro.fbx"
@@ -201,7 +203,7 @@ if __name__ == "__main__":
     UPPER_VIEWS = True
     CIRCLE_FIXED_START = (0,0,0)
     CIRCLE_FIXED_END = (.7,0,0)
-    branches = ['z_up', 'z_x_180', 'z_y_180']
+    branches = ['z_up', 'z_x_180']
     print("------------")
     print("No.%04d: %s" %(index, fbx_dir))
 
@@ -220,7 +222,7 @@ if __name__ == "__main__":
             for bound_point in obj.bound_box:
                 bound_list.append(np.array(bound_point))
                 
-    loc = np.array(bpy.data.objects[1].location) 
+    loc = np.array(bpy.data.objects[3].location) 
     # all the objects of the model got the same location, subtract by this location will center the model
 
 
@@ -241,8 +243,8 @@ if __name__ == "__main__":
         if min_index == 0:
             min_box, max_box = dealRotate(bd_min,bd_max,loc,axis='Y')
         scale_co = get_scale_co(hwd)
-        bd_min = (min_box - loc) / scale_co + loc
-        bd_max = (max_box - loc) / scale_co + loc
+        bd_min = (min_box - loc) * scale_co + loc
+        bd_max = (max_box - loc) * scale_co + loc
 
     scale(hwd)
 
@@ -315,13 +317,13 @@ if __name__ == "__main__":
 
 
     # Add a camera
-    bpy.ops.object.camera_add(align = 'VIEW', location = (0, 0, 0), rotation = (0, 0, -1), scale = (1, 1, 1))
+    # bpy.ops.object.camera_add(align = 'VIEW', location = (0, 0, 0), rotation = (0, 0, -1), scale = (1, 1, 1))
     #camera_obj = bpy.data.objects.new('Camera', align = 'VIEW', location = (-0.5851664543151855, -7.603287696838379, 1.8090481758117676), rotation = (1.24895, 0.0139616, 0.468225), scale = (1, 1, 1))
     cam = bpy.data.objects['Camera']
     scene.camera = cam
 
     ## Wenchao part starts
-    for j in range(3):
+    for j in range(2):
         branch_dir = os.path.join(output_dir, branches[j])
         if not os.path.isdir(branch_dir):
             os.makedirs(branch_dir)
@@ -333,14 +335,19 @@ if __name__ == "__main__":
 
         if j == 1:
             selectCar()
-            min_box, max_box = dealRotate(bd_min, bd_max, loc,axis = 'X')
-            min_box, max_box = dealRotate(bd_min, bd_max, loc,axis = 'X')
-        elif j == 2:
-            selectCar()
-            min_box, max_box = dealRotate(bd_min, bd_max, loc,axis = 'X')
-            min_box, max_box = dealRotate(bd_min, bd_max, loc,axis = 'X')
-            min_box, max_box = dealRotate(bd_min, bd_max, loc,axis = 'Y')
-            min_box, max_box = dealRotate(bd_min, bd_max, loc,axis = 'Y')
+            if (max_index != 2) or (min_index == 1):
+                loc = np.array(bpy.data.objects[3].location)
+                bd_min, bd_max = dealRotate(bd_min, bd_max, loc, axis = 'X')
+                loc = np.array(bpy.data.objects[3].location)
+                min_box, max_box = dealRotate(bd_min, bd_max, loc, axis = 'X')
+            elif min_index == 0:
+                loc = np.array(bpy.data.objects[3].location)
+                bd_min, bd_max = dealRotate(bd_min, bd_max, loc, axis = "Y")
+                loc = np.array(bpy.data.objects[3].location)
+                min_box, max_box = dealRotate(bd_min, bd_max, loc, axis = "Y")
+            bb_matrix = []
+            bb_matrix.append(list(min_box))
+            bb_matrix.append(list(max_box))
         cam.location = (0, cam_len, cam_z)
         cam_constraint = cam.constraints.new(type='TRACK_TO')
         cam_constraint.track_axis = 'TRACK_NEGATIVE_Z'
