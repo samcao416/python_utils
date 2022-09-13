@@ -35,9 +35,9 @@ if __name__ == "__main__":
 
     root_dir = arg.path
     current_time = datetime.datetime.now()
-    if not os.path.isdir(os.path.join(root_dir, 'outputs_flips')):
-        os.makedirs(os.path.join(root_dir, 'outputs_flips'))
-    log_file = os.path.join(root_dir, 'outputs_flips', 'log_run_shell_%04d_%04d_%s.txt' %(arg.start, arg.end, current_time.strftime("%m_%d_%H_%M")))
+    if not os.path.isdir(os.path.join(root_dir, 'outputs_no_bg_line')):
+        os.makedirs(os.path.join(root_dir, 'outputs_no_bg_line'))
+    log_file = os.path.join(root_dir, 'outputs_no_bg_line', 'log_run_shell_%04d_%04d_%s.txt' %(arg.start, arg.end, current_time.strftime("%m_%d_%H_%M")))
     
 
     ### The following code will find out all the .fbx files.
@@ -91,7 +91,7 @@ if __name__ == "__main__":
             
             try:
                 # os.system("blender -b -P test_blender_render.py -- \"%s\" %d" %(fbx_path, index))
-                os.system("blender -b -P test_blender_flip_debug.py -- \"%s\" %d" %(fbx_path, index))
+                os.system("blender -b -P render_no_bg_line.py -- \"%s\" %d" %(fbx_path, index))
                 image_num = check_images(root_dir, index)
                 if image_num:
                     print("No.%04d Success %04d Images Rendered. Path: %s" %(index, image_num, fbx_path), file = f)

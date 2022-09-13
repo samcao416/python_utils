@@ -16,7 +16,7 @@ def reset_blender():
     bpy.ops.object.select_all(action = 'DESELECT')
     for obj in bpy.data.objects:
         # print(ob.name)
-        if obj.name == ('Light') or obj.name == ('Camera'):
+        if obj.name == ('Light' or 'Camera'):
             continue
         obj.select_set(True)
         bpy.ops.object.delete()
@@ -29,23 +29,15 @@ def import_fbx(path):
     return True
 
 def rotateY(a,point):
-    # rotation matrix for a point along Y axis
+    # a for rotation angle
     rotate_M = np.array([[math.cos(a),0,math.sin(a)],[0,1,0],[-math.sin(a),0,math.cos(a)]])
     return rotate_M @ point
 
 def rotateX(a,point):
-    # rotation matrix for a point along X axis
     rotate_M = np.array([[1,0,0],[0,math.cos(a),-math.sin(a)],[0,math.sin(a),math.cos(a)]])
     return rotate_M @ point
 
 def dealRotate(bd_min,bd_max,loc,axis):
-    '''
-    This function first rotate all the car long a certain axis for 90 degrees
-    Then rotate the bounding box along a certrain axis for 90 degrees
-
-    '''
-
-    # rotation all the objects in the scene other than Light and Camera
     for obj in bpy.data.objects:
         if ('Light' in obj.name) or ('Camera' in obj.name):
             continue
@@ -63,27 +55,20 @@ def dealRotate(bd_min,bd_max,loc,axis):
     
 
     bd = np.stack([bd_min,bd_max],axis=0)
+    print(bd)
     bd_min = np.min(bd,axis = 0)+loc
     bd_max = np.max(bd,axis = 0)+loc
 
     translate_bd(bd_min,bd_max)
 
-    zmax = bd_max[2] - bd_min[2]
+    zmax = bd_max[2]
     xyz_min = (bd_min - bd_max) / 2
     xyz_max = (bd_max - bd_min) / 2
-    bd_min = xyz_min
-    bd_max = xyz_max
     bd_min[2] = 0
     bd_max[2] = zmax
     return bd_min, bd_max
 
 def cal_bd():
-    '''
-    This function calculate the six coordinate of the bounding box (bd_max, bd_min)
-    hwd: the three length(dimension) of the bounding box
-    max_index : the longest side index of the bounding box
-    min_index : the shortest side index of the bounding box
-    '''
     bound_list = []
     for obj in bpy.data.objects:
         #print(obj.name)
@@ -131,7 +116,7 @@ def translate_bd(bd_min,bd_max):
     hwd = bd_max-bd_min
     h = np.max(hwd)
     scale = 1
-    translatez =  bd_min[2]
+    translatez =  bd_min[2]/1000
     translatey = ((bd_max[1]+bd_min[1])/2)
     translatex = ((bd_max[0]+bd_min[0])/2)
     selectCar()
@@ -177,34 +162,32 @@ if __name__ == "__main__":
     '''
             Initialization       
     '''
-    DEBUG = False
-     
+    DEBUG = True
     if DEBUG:
-        #fbx_dir = "/media/stereye/新加卷/Sam/car_models/130_benz/Mercedes-Benz C63 AMG Coupe 2017.zip_extract/Mercedes-Benz_C63_AMG_Coupe_2017/Mercedes-Benz_C63_AMG_Coupe_2017_set.fbx"
+        fbx_dir = "/media/stereye/新加卷/Sam/car_models/130_benz/Mercedes-Benz C63 AMG Coupe 2017.zip_extract/Mercedes-Benz_C63_AMG_Coupe_2017/Mercedes-Benz_C63_AMG_Coupe_2017_set.fbx"
         # fbx_dir = "/media/stereye/新加卷/Sam/car_models/77_chevrolet/Chevrolet Camaro SS 2020 3D model.zip_extract/Chevrolet Camaro SS 2020 3D model/Chevrolet Camaro/camaro.fbx"
         #fbx_dir = "/media/stereye/新加卷/Sam/car_models/64_porsche/porsche-cayenne-gts-coupe-2020.zip_extract/porsche-cayenne-gts-coupe-2020/porsche-cayenne-gts-coupe-2020.fbx" # for bottom up debug
-        fbx_dir = "/media/stereye/新加卷/Sam/car_models/130_benz/Mercedes-Benz 300 SL 1957.zip_extract/Mercedes-Benz 300 SL 1957/Mercedes-Benz 300 SL 1957 3D model/Mercedes-Benz_300_SL_(W198_II)_roadster_1957.fbx"
         index = 0
-        output_dir = "./outputs_flip_debug/No_%04d" %(index)
+        output_dir = "./outputs_debug/No_%04d" %(index)
     else:
         fbx_dir = sys.argv[-2]
         index = int(sys.argv[-1])
-        output_dir = "./outputs_flips/No_%04d" %(index)
+        output_dir = "./outputs/No_%04d" %(index)
     
     if not os.path.isdir(output_dir):
         os.makedirs(output_dir)
     # if not os.path.isdir(os.path.join(output_dir, "images")):
     #     os.makedirs(os.path.join(output_dir, "images"))
 
-    VIEWS = 50
+    VIEWS = 5
     RESOLUTION = 800
     DEPTH_SCALE = 1.4
-    COLOR_DEPTH = 32
-    FORMAT = 'OPEN_EXR'
+    COLOR_DEPTH = 8
+    FORMAT = 'PNG'
     UPPER_VIEWS = True
     CIRCLE_FIXED_START = (0,0,0)
     CIRCLE_FIXED_END = (.7,0,0)
-    branches = ['z_up', 'z_x_180']
+    branches = ['z_up', 'z_down']
     print("------------")
     print("No.%04d: %s" %(index, fbx_dir))
 
@@ -223,8 +206,7 @@ if __name__ == "__main__":
             for bound_point in obj.bound_box:
                 bound_list.append(np.array(bound_point))
                 
-    loc = np.array(bpy.data.objects[3].location) 
-    # all the objects of the model got the same location, subtract by this location will center the model
+    loc = np.array(bpy.data.objects[1].location)
 
 
     bd_min, bd_max, hwd, min_index, max_index = cal_bd()
@@ -244,8 +226,8 @@ if __name__ == "__main__":
         if min_index == 0:
             min_box, max_box = dealRotate(bd_min,bd_max,loc,axis='Y')
         scale_co = get_scale_co(hwd)
-        bd_min = (min_box - loc) * scale_co + loc
-        bd_max = (max_box - loc) * scale_co + loc
+        bd_min = (min_box - loc) / scale_co + loc
+        bd_max = (max_box - loc) / scale_co + loc
 
     scale(hwd)
 
@@ -256,6 +238,7 @@ if __name__ == "__main__":
     bb_matrix.append(list(bd_max))
     bb_matrix.append(list(bd_min))
 
+    z_mean = (bb_matrix[0][2] + bb_matrix[1][2]) / 2
 
     # Render Optimizations
     scene.render.use_persistent_data = True
@@ -270,7 +253,6 @@ if __name__ == "__main__":
 
     # Add passes for additionally dumping albedo and normals.
     scene.view_layers["RenderLayer"].use_pass_normal = True
-    scene.view_layers["RenderLayer"].use_pass_z = True
     scene.render.image_settings.file_format = str(FORMAT)
     scene.render.image_settings.color_depth = str(COLOR_DEPTH)
 
@@ -319,7 +301,7 @@ if __name__ == "__main__":
 
 
     # Add a camera
-    # bpy.ops.object.camera_add(align = 'VIEW', location = (0, 0, 0), rotation = (0, 0, -1), scale = (1, 1, 1))
+    bpy.ops.object.camera_add(align = 'VIEW', location = (0, 0, 0), rotation = (0, 0, -1), scale = (1, 1, 1))
     #camera_obj = bpy.data.objects.new('Camera', align = 'VIEW', location = (-0.5851664543151855, -7.603287696838379, 1.8090481758117676), rotation = (1.24895, 0.0139616, 0.468225), scale = (1, 1, 1))
     cam = bpy.data.objects['Camera']
     scene.camera = cam
@@ -335,19 +317,8 @@ if __name__ == "__main__":
             if not os.path.isdir(os.path.join(branch_dir, content)):
                 os.makedirs(os.path.join(branch_dir, content))
 
-        if j == 1:
-            selectCar()
-            if (max_index != 2) or (min_index == 1):
-                loc = np.array(bpy.data.objects[3].location)
-                bd_min, bd_max = dealRotate(bd_min, bd_max, loc, axis = 'X')
-                loc = np.array(bpy.data.objects[3].location)
-                min_box, max_box = dealRotate(bd_min, bd_max, loc, axis = 'X')
-            elif min_index == 0:
-                loc = np.array(bpy.data.objects[3].location)
-                bd_min, bd_max = dealRotate(bd_min, bd_max, loc, axis = "Y")
-                loc = np.array(bpy.data.objects[3].location)
-                min_box, max_box = dealRotate(bd_min, bd_max, loc, axis = "Y")
-            bb_matrix.append(list(max_box))
+        if j:
+            cam_z = 2 * z_mean - cam_z
         cam.location = (0, cam_len, cam_z)
         cam_constraint = cam.constraints.new(type='TRACK_TO')
         cam_constraint.track_axis = 'TRACK_NEGATIVE_Z'
@@ -377,7 +348,7 @@ if __name__ == "__main__":
         ### Wenchao part ends
 
         bpy.data.scenes['Scene'].render.image_settings.file_format = 'PNG'
-        bpy.data.scenes['Scene'].render.image_settings.color_depth = '8'
+        
         bpy.data.scenes['Scene'].render.film_transparent = True
         
         ### Wenchao part starts
@@ -400,7 +371,7 @@ if __name__ == "__main__":
             bpy.ops.render.render(write_still=True)  # render still
 
             frame_data = {
-                'file_path': os.path.join('rgb' , os.path.basename(scene.render.filepath)),
+                'file_path': os.path.join('rgb' + os.path.basename(scene.render.filepath)),
                 # 'cam_location': list(cam.location),
                 'rotation': radians(stepsize),
                 'transform_matrix': listify_matrix(cam.matrix_world)

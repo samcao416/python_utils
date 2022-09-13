@@ -1,12 +1,10 @@
-import sys
-import os
 import numpy as np
+import os
 import bpy
 import json
 import math
-
-#fbx_dir = "/media/stereye/新加卷/Sam/car_models/64_porsche/Car Porsche 911 Carrera Cabriolet 2019.rar_extract/Porsche 911 Carrera Cabriolet 2019/Porsche 911 carrera Cabriolet.FBX"
-
+import sys
+from math import radians
 
 def reset_blender():
     '''
@@ -172,51 +170,88 @@ def parent_obj_to_camera(b_camera):
     # scn.objects.active = b_empty
     return b_empty
 
+def draw_bbox(bbox):
+    bbox = np.array(bbox)
+    if bbox.shape != (2, 3):
+        raise TypeError("Wrong Dimenstion of Bbox")
+    # cal culation the middle and dimension of the bbox
+    bbox_center = np.mean(bbox, axis = 0)
+    bbox_dimension = bbox[0] - bbox[1]
+
+    bpy.ops.mesh.primitive_cube_add(location = (bbox_center[0], bbox_center[1], bbox_center[2]), \
+                                    scale = (bbox_dimension[0] /2, bbox_dimension[1]/2, bbox_dimension[2]/2))
+    bpy.data.objects['Cube'].display_type = 'BOUNDS'
+
+def delete_bbox():
+    obj = bpy.data.objects['Cube']
+    obj.select_set(True)
+    bpy.ops.object.delete()
+
+
+
 if __name__ == "__main__":
-
     '''
-            Initialization       
+        Initialization Arguments
     '''
-    DEBUG = False
-     
-    if DEBUG:
-        #fbx_dir = "/media/stereye/新加卷/Sam/car_models/130_benz/Mercedes-Benz C63 AMG Coupe 2017.zip_extract/Mercedes-Benz_C63_AMG_Coupe_2017/Mercedes-Benz_C63_AMG_Coupe_2017_set.fbx"
-        # fbx_dir = "/media/stereye/新加卷/Sam/car_models/77_chevrolet/Chevrolet Camaro SS 2020 3D model.zip_extract/Chevrolet Camaro SS 2020 3D model/Chevrolet Camaro/camaro.fbx"
-        #fbx_dir = "/media/stereye/新加卷/Sam/car_models/64_porsche/porsche-cayenne-gts-coupe-2020.zip_extract/porsche-cayenne-gts-coupe-2020/porsche-cayenne-gts-coupe-2020.fbx" # for bottom up debug
-        fbx_dir = "/media/stereye/新加卷/Sam/car_models/130_benz/Mercedes-Benz 300 SL 1957.zip_extract/Mercedes-Benz 300 SL 1957/Mercedes-Benz 300 SL 1957 3D model/Mercedes-Benz_300_SL_(W198_II)_roadster_1957.fbx"
-        index = 0
-        output_dir = "./outputs_flip_debug/No_%04d" %(index)
-    else:
-        fbx_dir = sys.argv[-2]
-        index = int(sys.argv[-1])
-        output_dir = "./outputs_flips/No_%04d" %(index)
-    
-    if not os.path.isdir(output_dir):
-        os.makedirs(output_dir)
-    # if not os.path.isdir(os.path.join(output_dir, "images")):
-    #     os.makedirs(os.path.join(output_dir, "images"))
-
+    DEBUG = True
+    SHOW_BBOX = True
     VIEWS = 50
     RESOLUTION = 800
     DEPTH_SCALE = 1.4
     COLOR_DEPTH = 32
     FORMAT = 'OPEN_EXR'
-    UPPER_VIEWS = True
     CIRCLE_FIXED_START = (0,0,0)
     CIRCLE_FIXED_END = (.7,0,0)
     branches = ['z_up', 'z_x_180']
+    if SHOW_BBOX:
+        contents = ['rgb', 'depth', 'normal', 'bbox']
+    else:
+        contents = ['rgb', 'depth', 'normal']
+
+    '''
+        Step 1: import FBX and scene
+    '''
+
+    if DEBUG:
+        fbx_dir = "/media/stereye/新加卷/Sam/car_models/130_benz/Mercedes-Benz C63 AMG Coupe 2017.zip_extract/Mercedes-Benz_C63_AMG_Coupe_2017/Mercedes-Benz_C63_AMG_Coupe_2017_set.fbx"
+        # fbx_dir = "/media/stereye/新加卷/Sam/car_models/77_chevrolet/Chevrolet Camaro SS 2020 3D model.zip_extract/Chevrolet Camaro SS 2020 3D model/Chevrolet Camaro/camaro.fbx"
+        #fbx_dir = "/media/stereye/新加卷/Sam/car_models/64_porsche/porsche-cayenne-gts-coupe-2020.zip_extract/porsche-cayenne-gts-coupe-2020/porsche-cayenne-gts-coupe-2020.fbx" # for bottom up debug
+        # fbx_dir = "/media/stereye/新加卷/Sam/car_models/130_benz/Mercedes-Benz 300 SL 1957.zip_extract/Mercedes-Benz 300 SL 1957/Mercedes-Benz 300 SL 1957 3D model/Mercedes-Benz_300_SL_(W198_II)_roadster_1957.fbx"
+        # fbx_dir = "/media/stereye/新加卷/Sam/car_models/64_porsche/porsche-911-gt3-cup.zip_extract/porsche-911-gt3-cup/porsche-911-gt3-cup.fbx" 
+        # fbx_dir = "/media/stereye/新加卷/Sam/car_models/130_benz/Mercedes-Benz 300d (W189) 1957.zip_extract/Mercedes-Benz 300d (W189) 1957/Mercedes-Benz 300d (W189) 1957 3D model/Mercedes-Benz_300d_(W189)_1957.fbx"
+        index = 0
+        output_dir = "./outputs_no_bg_circle_debug/No_%04d" %(index)
+    else:
+        fbx_dir = sys.argv[-2]
+        index = int(sys.argv[-1])
+        output_dir = "./outputs_no_bg_circle/No_%04d" %(index)
+
+    
+    reset_blender()
+    import_fbx(fbx_dir)
+ 
+    '''
+        Step 2: Make Dirs
+    '''
+    if not os.path.isdir(output_dir):
+        os.makedirs(output_dir)
+    for branch in branches:
+        branch_dir = os.path.join(output_dir, branch)
+        if not os.path.isdir(branch_dir):
+            os.makedirs(branch_dir)
+
+        
+        for content in contents:
+            if not os.path.isdir(os.path.join(branch_dir, content)):
+                os.makedirs(os.path.join(branch_dir, content))
     print("------------")
     print("No.%04d: %s" %(index, fbx_dir))
 
-    '''
-            Reset blender and import model    
-    '''
-    reset_blender()
-    import_fbx(fbx_dir)
 
+    '''
+        Step 3: Transforming
+    '''
     scene = bpy.context.scene
-    ### Wenchao Part Start
-    ### dealing with models in the scene
     bound_list = []
     for obj in bpy.data.objects:
         if not (('light' in obj.name) & ('Light' in obj.name) & ('Camera' in obj.name) & ('camera' in obj.name)):
@@ -255,88 +290,54 @@ if __name__ == "__main__":
     bb_matrix = []
     bb_matrix.append(list(bd_max))
     bb_matrix.append(list(bd_min))
-
-
-    # Render Optimizations
-    scene.render.use_persistent_data = True
-
-    # Set up rendering of depth map.
-    scene.use_nodes = True
-    tree = scene.node_tree
-    links = tree.links
-
+    
     for layer in scene.view_layers:
         layer.name = "RenderLayer"
-
-    # Add passes for additionally dumping albedo and normals.
-    scene.view_layers["RenderLayer"].use_pass_normal = True
-    scene.view_layers["RenderLayer"].use_pass_z = True
-    scene.render.image_settings.file_format = str(FORMAT)
-    scene.render.image_settings.color_depth = str(COLOR_DEPTH)
-
-    if 'Custom Outputs' not in tree.nodes:
-        # Create input render layer node.
-        render_layers = tree.nodes.new('CompositorNodeRLayers')
-        render_layers.label = 'Custom Outputs'
-        render_layers.name = 'Custom Outputs'
-
-        depth_file_output = tree.nodes.new(type="CompositorNodeOutputFile")
-        depth_file_output.label = 'Depth Output'
-        depth_file_output.name = 'Depth Output'
-        if FORMAT == 'OPEN_EXR':
-            links.new(render_layers.outputs['Depth'], depth_file_output.inputs[0])
-        else:
-        # Remap as other types can not represent the full range of depth.
-            map = tree.nodes.new(type="CompositorNodeMapRange")
-            # Size is chosen kind of arbitrarily, try out until you're satisfied with resulting depth map.
-            map.inputs['From Min'].default_value = 0
-            map.inputs['From Max'].default_value = 8
-            map.inputs['To Min'].default_value = 1
-            map.inputs['To Max'].default_value = 0
-            links.new(render_layers.outputs['Depth'], map.inputs[0])
-
-            links.new(map.outputs[0], depth_file_output.inputs[0])
-
-        normal_file_output = tree.nodes.new(type="CompositorNodeOutputFile")
-        normal_file_output.label = 'Normal Output'
-        normal_file_output.name = 'Normal Output'
-        links.new(render_layers.outputs['Normal'], normal_file_output.inputs[0])
-
-    # Background
-    scene.render.dither_intensity = 0.0
-    scene.render.film_transparent = True
-
-    # Create collection for objects not to render with background
-
-        
-    objs = [ob for ob in scene.objects if ob.type in ('EMPTY') and 'Empty' in ob.name]
-    bpy.ops.object.delete({"selected_objects": objs})
-    scene.render.resolution_x = RESOLUTION
-    scene.render.resolution_y = RESOLUTION
-    scene.render.resolution_percentage = 100
-
-    ### Wenchao part ends
 
 
     # Add a camera
     # bpy.ops.object.camera_add(align = 'VIEW', location = (0, 0, 0), rotation = (0, 0, -1), scale = (1, 1, 1))
     #camera_obj = bpy.data.objects.new('Camera', align = 'VIEW', location = (-0.5851664543151855, -7.603287696838379, 1.8090481758117676), rotation = (1.24895, 0.0139616, 0.468225), scale = (1, 1, 1))
+    
+    rotate_or_not = True
+    if rotate_or_not:
+        selectCar()
+        if (max_index != 2) or (min_index == 1):
+            loc = np.array(bpy.data.objects[3].location)
+            bd_min, bd_max = dealRotate(bd_min, bd_max, loc, axis = 'X')
+            loc = np.array(bpy.data.objects[3].location)
+            min_box, max_box = dealRotate(bd_min, bd_max, loc, axis = 'X')
+        elif min_index == 0:
+            loc = np.array(bpy.data.objects[3].location)
+            bd_min, bd_max = dealRotate(bd_min, bd_max, loc, axis = "Y")
+            loc = np.array(bpy.data.objects[3].location)
+            min_box, max_box = dealRotate(bd_min, bd_max, loc, axis = "Y")
+        bb_matrix = []
+        bb_matrix.append(list(min_box))
+        bb_matrix.append(list(max_box))
+
+    '''
+        Step 4: Rendering
+    '''
+
+    # Render Optimizations
+    scene = bpy.context.scene
+    scene.render.use_persistent_data = True
+    
     cam = bpy.data.objects['Camera']
     scene.camera = cam
 
-    ## Wenchao part starts
-    for j in range(2):
+    for j in range(len(branches)):
         branch_dir = os.path.join(output_dir, branches[j])
-        if not os.path.isdir(branch_dir):
-            os.makedirs(branch_dir)
 
-        contents = ['rgb', 'depth', 'normal']
-        for content in contents:
-            if not os.path.isdir(os.path.join(branch_dir, content)):
-                os.makedirs(os.path.join(branch_dir, content))
-
-        if j == 1:
+        cam.location = (0, cam_len, cam_z)
+        cam_constraint = cam.constraints.new(type='TRACK_TO')
+        cam_constraint.track_axis = 'TRACK_NEGATIVE_Z'
+        cam_constraint.up_axis = 'UP_Y'
+        
+        if j != 0:
             selectCar()
+            bb_matrix = []
             if (max_index != 2) or (min_index == 1):
                 loc = np.array(bpy.data.objects[3].location)
                 bd_min, bd_max = dealRotate(bd_min, bd_max, loc, axis = 'X')
@@ -347,22 +348,72 @@ if __name__ == "__main__":
                 bd_min, bd_max = dealRotate(bd_min, bd_max, loc, axis = "Y")
                 loc = np.array(bpy.data.objects[3].location)
                 min_box, max_box = dealRotate(bd_min, bd_max, loc, axis = "Y")
+            bb_matrix.append(list(min_box))
             bb_matrix.append(list(max_box))
-        cam.location = (0, cam_len, cam_z)
-        cam_constraint = cam.constraints.new(type='TRACK_TO')
-        cam_constraint.track_axis = 'TRACK_NEGATIVE_Z'
-        cam_constraint.up_axis = 'UP_Y'
-        b_empty = parent_obj_to_camera(cam)
-        cam_constraint.target = b_empty
+        
 
-        # Data to store in JSON file
+        # Set up rendering of depth map.
+        scene.use_nodes = True
+        tree = scene.node_tree
+        links = tree.links
+        
+        # Add passes for additionally dumping albedo and normals.
+        scene.view_layers["RenderLayer"].use_pass_normal = True
+        scene.view_layers["RenderLayer"].use_pass_z = True
+        scene.render.image_settings.file_format = str(FORMAT)
+        scene.render.image_settings.color_depth = str(COLOR_DEPTH)
+
+        if 'Custom Outputs' not in tree.nodes:
+            # Create input render layer node.
+            render_layers = tree.nodes.new('CompositorNodeRLayers')
+            render_layers.label = 'Custom Outputs'
+            render_layers.name = 'Custom Outputs'
+
+            depth_file_output = tree.nodes.new(type="CompositorNodeOutputFile")
+            depth_file_output.label = 'Depth Output'
+            depth_file_output.name = 'Depth Output'
+            if FORMAT == 'OPEN_EXR':
+                links.new(render_layers.outputs['Depth'], depth_file_output.inputs[0])
+            else:
+            # Remap as other types can not represent the full range of depth.
+                map = tree.nodes.new(type="CompositorNodeMapRange")
+                # Size is chosen kind of arbitrarily, try out until you're satisfied with resulting depth map.
+                map.inputs['From Min'].default_value = 0
+                map.inputs['From Max'].default_value = 8
+                map.inputs['To Min'].default_value = 1
+                map.inputs['To Max'].default_value = 0
+                links.new(render_layers.outputs['Depth'], map.inputs[0])
+
+                links.new(map.outputs[0], depth_file_output.inputs[0])
+
+            normal_file_output = tree.nodes.new(type="CompositorNodeOutputFile")
+            normal_file_output.label = 'Normal Output'
+            normal_file_output.name = 'Normal Output'
+            links.new(render_layers.outputs['Normal'], normal_file_output.inputs[0])
+
+        # Background
+        scene.render.dither_intensity = 0.0
+        scene.render.film_transparent = True
+
+        # Create collection for objects not to render with background
+
+        for layer in scene.view_layers:
+            layer.name = "RenderLayer"
+        
+        objs = [ob for ob in scene.objects if ob.type in ('EMPTY') and 'Empty' in ob.name]
+        bpy.ops.object.delete({"selected_objects": objs})
+        scene.render.resolution_x = RESOLUTION
+        scene.render.resolution_y = RESOLUTION
+        scene.render.resolution_percentage = 100
+
+        
         out_data = {
-            'camera_angle_x': bpy.data.objects['Camera'].data.angle_x,
-            'bound_box': bb_matrix,
-            'fbx_path' : fbx_dir,
-        }
+                'camera_angle_x': bpy.data.objects['Camera'].data.angle_x,
+                'bound_box': bb_matrix,
+                'fbx_path' : fbx_dir,
+            }
 
-        from math import radians
+        
 
         stepsize = 360.0 / VIEWS
         vertical_diff = CIRCLE_FIXED_END[0] - CIRCLE_FIXED_START[0]
@@ -373,22 +424,19 @@ if __name__ == "__main__":
             output_node.base_path = ''
 
         out_data['frames'] = []
-
-        ### Wenchao part ends
-
+        
         bpy.data.scenes['Scene'].render.image_settings.file_format = 'PNG'
         bpy.data.scenes['Scene'].render.image_settings.color_depth = '8'
         bpy.data.scenes['Scene'].render.film_transparent = True
         
         ### Wenchao part starts
+        b_empty = parent_obj_to_camera(cam)
+        cam_constraint.target = b_empty
         b_empty.rotation_euler = CIRCLE_FIXED_START
         b_empty.rotation_euler[0] = CIRCLE_FIXED_START[0] + vertical_diff
 
         for i in range(0, VIEWS):
-            # if DEBUG:
-            #     i = np.random.randint(0,VIEWS)
-            #     b_empty.rotation_euler[0] = CIRCLE_FIXED_START[0] + (np.cos(radians(stepsize*i))+1)/2 * vertical_diff
-            #     b_empty.rotation_euler[2] += radians(2*stepsize*i)
+        
         
             print("Rotation {}, {}".format((stepsize * i), radians(stepsize * i)))
             bpy.data.scenes['Scene'].render.filepath = os.path.join(branch_dir,"rgb", "%04d.png" %(i))
@@ -398,6 +446,19 @@ if __name__ == "__main__":
 
 
             bpy.ops.render.render(write_still=True)  # render still
+
+            if SHOW_BBOX:
+                draw_bbox(bb_matrix)
+                scene.view_layers["RenderLayer"].use_pass_normal = False
+                scene.view_layers["RenderLayer"].use_pass_z = False  
+
+                bpy.data.scenes['Scene'].render.filepath = os.path.join(branch_dir,"bbox", "%04d.png" %(i))
+                bpy.ops.render.render(write_still=True)
+
+                scene.view_layers["RenderLayer"].use_pass_normal = True
+                scene.view_layers["RenderLayer"].use_pass_z = True
+                delete_bbox()
+
 
             frame_data = {
                 'file_path': os.path.join('rgb' , os.path.basename(scene.render.filepath)),
@@ -409,14 +470,12 @@ if __name__ == "__main__":
 
             b_empty.rotation_euler[0] = CIRCLE_FIXED_START[0] + (np.cos(radians(stepsize*i))+1)/2 * vertical_diff
             b_empty.rotation_euler[2] += radians(2*stepsize)
-
-
+        
+        
+            
+            
         with open(branch_dir + '/' + 'transforms.json', 'w') as out_file:
-            json.dump(out_data, out_file, indent=4)
-
-    # Wenchao part ends
-    
-    #bpy.ops.render.render( write_still = True )
+                json.dump(out_data, out_file, indent=4)
 
     print("No.%04d finished." %(index))
     print("------------")
